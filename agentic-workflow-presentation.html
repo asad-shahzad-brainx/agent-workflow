@@ -1,0 +1,1387 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>One planner, many executors — Caravan build report</title>
+  <style>
+    :root {
+      --field: #c6c1b5;
+      --sheet: #dad6cc;
+      --panel: #e4e1d9;
+      --ink: #1b221f;
+      --ink-soft: #4c544f;
+      --ink-faint: #7b817b;
+      --indigo: #39457a;
+      --pine: #2c5b4c;
+      --ochre: #8a6a1f;
+      --hair: rgba(27, 34, 31, .16);
+      --hair-strong: rgba(27, 34, 31, .34);
+      --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", "Hoefler Text", Georgia, serif;
+      --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      --ease: cubic-bezier(.2, .7, .2, 1);
+      font-family: var(--sans);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: var(--field);
+      color: var(--ink);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button, a { font: inherit; }
+    button { color: inherit; }
+    a { color: var(--indigo); }
+
+    .skip-link {
+      position: fixed; left: 16px; top: -80px; z-index: 100;
+      padding: 10px 14px; border-radius: 4px;
+      background: var(--ink); color: var(--sheet);
+      transition: top .2s ease;
+    }
+    .skip-link:focus { top: 16px; }
+
+    .deck { position: fixed; inset: 0; isolation: isolate; }
+
+    .slide {
+      position: absolute; inset: 0;
+      display: grid; place-items: center;
+      visibility: hidden; opacity: 0;
+      transition: opacity .34s var(--ease), visibility .34s;
+      pointer-events: none;
+    }
+    .slide.active { visibility: visible; opacity: 1; pointer-events: auto; z-index: 2; }
+
+    .slide-inner {
+      --u: min(1vw, 1.78vh);
+      position: relative;
+      display: flex; flex-direction: column;
+      width: min(95vw, calc(90vh * 16 / 9));
+      aspect-ratio: 16 / 9;
+      overflow: hidden;
+      padding: clamp(30px, calc(3.4 * var(--u)), 62px) clamp(34px, calc(4.2 * var(--u)), 78px) clamp(28px, calc(3.2 * var(--u)), 56px);
+      background: var(--sheet);
+      border: 1px solid rgba(27, 34, 31, .1);
+      box-shadow: 0 1px 1px rgba(27,34,31,.06), 0 16px 44px rgba(27,34,31,.16);
+    }
+
+    /* ---- running head ---- */
+    .runner {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 20px;
+      padding-bottom: 11px;
+      border-bottom: 1px solid var(--hair-strong);
+      color: var(--ink-faint);
+      font: 600 clamp(10px, calc(.78 * var(--u)), 13px)/1 var(--mono);
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+    .runner em { font-style: normal; color: var(--ink-soft); }
+
+    .slide-content {
+      position: relative;
+      display: flex; flex-direction: column;
+      flex: 1; min-height: 0;
+      padding-top: clamp(22px, 3vh, 44px);
+    }
+
+    /* ---- type ---- */
+    h1, h2, h3, p, ul { margin-top: 0; }
+
+    h1 {
+      max-width: 15em;
+      margin-bottom: 22px;
+      font-family: var(--serif);
+      font-size: clamp(38px, calc(4.4 * var(--u)), 72px);
+      font-weight: 600;
+      line-height: 1.03;
+      letter-spacing: -.02em;
+    }
+
+    h2 {
+      max-width: 17em;
+      margin-bottom: clamp(20px, 2.6vh, 34px);
+      font-family: var(--serif);
+      font-size: clamp(28px, calc(3.05 * var(--u)), 49px);
+      font-weight: 600;
+      line-height: 1.08;
+      letter-spacing: -.016em;
+    }
+
+    h3 {
+      margin-bottom: 8px;
+      font-size: clamp(16px, calc(1.34 * var(--u)), 22px);
+      font-weight: 650;
+      line-height: 1.2;
+      letter-spacing: -.008em;
+    }
+
+    p, li { font-size: clamp(14px, calc(1.16 * var(--u)), 19px); line-height: 1.5; }
+
+    .lead {
+      max-width: 30em;
+      color: var(--ink-soft);
+      font-size: clamp(17px, calc(1.62 * var(--u)), 26px);
+      line-height: 1.4;
+      letter-spacing: -.008em;
+    }
+
+    .note { color: var(--ink-soft); font-size: clamp(12px, calc(.96 * var(--u)), 16px); line-height: 1.45; }
+
+    .band ~ .foot, .steps ~ .phases ~ .foot { margin-top: clamp(18px, 2.6vh, 34px); }
+
+    .foot {
+      margin-top: auto;
+      padding-top: 16px;
+      color: var(--ink-faint);
+      font-size: clamp(11px, calc(.88 * var(--u)), 15px);
+      line-height: 1.4;
+    }
+
+    .indigo { color: var(--indigo); }
+    .pine { color: var(--pine); }
+    .ochre { color: var(--ochre); }
+
+    /* ---- columns ---- */
+    .cols { display: grid; gap: clamp(30px, calc(4.4 * var(--u)), 78px); flex: 1; min-height: 0; }
+    .cols.even { grid-template-columns: 1fr 1fr; }
+    .cols.wide-left { grid-template-columns: 1.25fr .75fr; }
+    .cols.wide-right { grid-template-columns: .8fr 1.2fr; }
+    .cols.narrow-right { grid-template-columns: 1.35fr .65fr; }
+    .mid { display: flex; flex-direction: column; justify-content: center; }
+
+    /* ---- rail: the one list primitive ---- */
+    .rail { display: flex; flex-direction: column; justify-content: center; gap: 0; }
+    .rail-item {
+      display: grid; grid-template-columns: 1fr; gap: 3px;
+      padding: clamp(11px, 1.5vh, 17px) 0;
+      border-top: 1px solid var(--hair);
+    }
+    .rail-item:first-child { border-top: 0; padding-top: 0; }
+    .rail-item:last-child { padding-bottom: 0; }
+    .rail-item strong { font-size: clamp(15px, calc(1.24 * var(--u)), 21px); font-weight: 650; letter-spacing: -.008em; }
+    .rail-item span { color: var(--ink-soft); font-size: clamp(12.5px, calc(1 * var(--u)), 17px); line-height: 1.42; }
+    .rail.numbered .rail-item { grid-template-columns: 3.2em 1fr; align-items: baseline; column-gap: 0; }
+    .rail.numbered .rail-item > b {
+      grid-row: span 2;
+      color: var(--ink-faint);
+      font: 600 clamp(11px, calc(.88 * var(--u)), 14px)/1.6 var(--mono);
+      letter-spacing: .06em;
+    }
+    .rail.marked .rail-item { grid-template-columns: 1.6em 1fr; column-gap: 0; align-items: baseline; }
+    .rail.marked .rail-item > b { grid-row: span 2; font: 700 clamp(13px, calc(1 * var(--u)), 17px)/1.5 var(--sans); }
+    .rail.marked .rail-item.yes > b { color: var(--pine); }
+    .rail.marked .rail-item.no > b { color: var(--ochre); }
+
+    /* ---- panel ---- */
+    .panel {
+      padding: clamp(20px, calc(2.1 * var(--u)), 34px) clamp(22px, calc(2.3 * var(--u)), 38px);
+      background: var(--panel);
+      border: 1px solid var(--hair);
+    }
+    .panel-label {
+      margin-bottom: 14px;
+      color: var(--ink-faint);
+      font: 600 clamp(10px, calc(.78 * var(--u)), 13px)/1 var(--mono);
+      letter-spacing: .14em; text-transform: uppercase;
+    }
+
+    /* ---- machine text ---- */
+    .prompt {
+      position: relative;
+      padding: clamp(20px, calc(2.1 * var(--u)), 34px) clamp(22px, calc(2.3 * var(--u)), 38px);
+      background: var(--panel);
+      border-left: 2px solid var(--indigo);
+      color: var(--ink);
+      font: clamp(12.5px, calc(1 * var(--u)), 16px)/1.6 var(--mono);
+      white-space: pre-wrap;
+    }
+    .prompt.exec { border-left-color: var(--ochre); }
+    .copy-btn {
+      position: absolute; top: 12px; right: 12px;
+      padding: 5px 10px;
+      border: 1px solid var(--hair-strong); border-radius: 3px;
+      background: transparent; color: var(--ink-soft);
+      font: 600 11px/1 var(--sans); letter-spacing: .04em;
+      cursor: pointer;
+    }
+    .copy-btn:hover, .copy-btn:focus-visible { outline: none; color: var(--ink); border-color: var(--ink); }
+
+    /* ---- cover ---- */
+    .cover { display: flex; flex-direction: column; justify-content: center; flex: 1; }
+    .cover h1 { max-width: 13em; }
+    .cover .lead { max-width: 34em; margin-bottom: clamp(26px, 4vh, 54px); }
+    .chain { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(24px, calc(3.4 * var(--u)), 62px); }
+    .chain-node { padding-top: 12px; border-top: 2px solid currentColor; color: var(--indigo); }
+    .chain-node:nth-child(2) { color: var(--ochre); }
+    .chain-node:nth-child(3) { color: var(--pine); }
+    .chain-node b { font: 600 clamp(10px, calc(.78 * var(--u)), 13px)/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+    .chain-node strong { display: block; min-height: 2.1em; margin-top: 9px; color: var(--ink); font-family: var(--serif); font-size: clamp(19px, calc(1.6 * var(--u)), 27px); font-weight: 600; line-height: 1.1; }
+    .chain-node span { display: block; margin-top: 4px; color: var(--ink-soft); font-size: clamp(12px, calc(.94 * var(--u)), 16px); }
+
+    /* ---- roles ---- */
+    .roles { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(24px, calc(3 * var(--u)), 52px); }
+    .role { padding-top: 14px; border-top: 2px solid currentColor; color: var(--indigo); }
+    .role.exec { color: var(--ochre); }
+    .role.verify { color: var(--pine); }
+    .role b { font: 600 clamp(10px, calc(.78 * var(--u)), 13px)/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+    .role strong { display: block; margin: 11px 0 9px; color: var(--ink); font-family: var(--serif); font-size: clamp(19px, calc(1.6 * var(--u)), 27px); font-weight: 600; }
+    .role p { margin: 0; color: var(--ink-soft); font-size: clamp(12.5px, calc(1.02 * var(--u)), 17px); line-height: 1.44; }
+    .role em { display: block; margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--hair); color: currentColor; font-style: normal; font-size: clamp(12px, calc(.94 * var(--u)), 16px); line-height: 1.4; }
+
+    .band { display: grid; grid-template-columns: 13em repeat(3, 1fr); gap: clamp(20px, calc(2.6 * var(--u)), 46px); margin-top: auto; padding-top: 18px; border-top: 1px solid var(--hair-strong); }
+    .band > b { color: var(--ink-faint); font: 600 clamp(10px, calc(.78 * var(--u)), 13px)/1.5 var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+    .band div strong { display: block; font-size: clamp(14px, calc(1.12 * var(--u)), 19px); font-weight: 650; }
+    .band div span { color: var(--ink-soft); font-size: clamp(11.5px, calc(.9 * var(--u)), 15px); }
+
+    /* ---- seven steps ---- */
+    .steps { position: relative; display: grid; grid-template-columns: repeat(7, 1fr); flex: 0 0 auto; margin-top: auto; gap: 0; }
+    .steps::before { content: ""; position: absolute; left: 0; right: 0; top: 26px; height: 1px; background: var(--hair-strong); }
+    .step { position: relative; padding-right: 14px; }
+    .step b { display: block; color: var(--ink-faint); font: 600 clamp(10px, calc(.8 * var(--u)), 13px)/1 var(--mono); letter-spacing: .1em; }
+    .step::after { content: ""; position: absolute; left: 0; top: 22px; width: 9px; height: 9px; background: var(--indigo); border-radius: 50%; }
+    .step:nth-child(n+5)::after { background: var(--ochre); }
+    .step:last-child::after { background: var(--pine); }
+    .step strong { display: block; margin-top: 30px; font-family: var(--serif); font-size: clamp(16px, calc(1.42 * var(--u)), 24px); font-weight: 600; }
+    .step span { display: block; margin-top: 5px; color: var(--ink-soft); font-size: clamp(11px, calc(.86 * var(--u)), 15px); line-height: 1.35; }
+    .phases { display: grid; grid-template-columns: 4fr 3fr; gap: 0; margin: clamp(18px, 3vh, 38px) 0 auto; }
+    .phase { padding-top: 10px; border-top: 1px solid currentColor; color: var(--indigo); font: 600 clamp(10px, calc(.8 * var(--u)), 13px)/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+    .phase.two { color: var(--ochre); margin-left: 14px; }
+
+    /* ---- questions ---- */
+    .questions { display: flex; flex-direction: column; justify-content: center; }
+    .questions p { padding: clamp(11px, 1.6vh, 18px) 0; border-top: 1px solid var(--hair); color: var(--ink); font-family: var(--serif); font-size: clamp(16px, calc(1.4 * var(--u)), 24px); line-height: 1.3; }
+    .questions p:first-of-type { border-top: 0; padding-top: 0; }
+
+    /* ---- issue sheet ---- */
+    .issue { display: flex; flex-direction: column; justify-content: center; }
+    .issue h3 { margin-bottom: 16px; font-family: var(--serif); font-size: clamp(19px, calc(1.65 * var(--u)), 28px); font-weight: 600; }
+    .field { display: grid; grid-template-columns: 8.5em 1fr; gap: 14px; padding: 10px 0; border-top: 1px solid var(--hair); }
+    .field b { color: var(--pine); font: 600 clamp(10px, calc(.78 * var(--u)), 13px)/1.7 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+    .field span { color: var(--ink-soft); font-size: clamp(12.5px, calc(1 * var(--u)), 17px); line-height: 1.45; }
+
+    /* ---- loop lanes ---- */
+    .lanes { display: grid; grid-template-columns: 1fr 1.3fr 1fr; gap: clamp(22px, calc(2.8 * var(--u)), 50px); flex: 1; min-height: 0; }
+    .lane { display: flex; flex-direction: column; justify-content: center; padding-top: 14px; border-top: 2px solid currentColor; color: var(--indigo); }
+    .lane.exec { color: var(--ochre); }
+    .lane.verify { color: var(--pine); }
+    .lane > b { font: 600 clamp(10px, calc(.78 * var(--u)), 13px)/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+    .act { padding: clamp(11px, 1.5vh, 16px) 0; border-top: 1px solid var(--hair); }
+    .act:first-of-type { margin-top: 14px; }
+    .act strong { display: block; color: var(--ink); font-size: clamp(14px, calc(1.16 * var(--u)), 20px); font-weight: 650; }
+    .act p { margin: 3px 0 0; color: var(--ink-soft); font-size: clamp(12px, calc(.96 * var(--u)), 16px); line-height: 1.4; }
+    .tdd { display: flex; gap: 8px; margin: 16px 0 0; }
+    .tdd span { flex: 1; padding: 8px 0; border: 1px solid currentColor; text-align: center; color: var(--ochre); font: 600 clamp(10px, calc(.84 * var(--u)), 14px)/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+    /* ---- context budget ---- */
+    .gauge { margin-bottom: clamp(20px, 3vh, 40px); }
+    .gauge-bar { position: relative; display: grid; grid-template-columns: 3fr 2fr 2fr; height: 14px; border: 1px solid var(--hair-strong); }
+    .gauge-bar i { display: block; }
+    .gauge-bar i:nth-child(1) { background: var(--pine); opacity: .45; }
+    .gauge-bar i:nth-child(2) { background: var(--ochre); opacity: .45; border-left: 1px solid var(--hair-strong); }
+    .gauge-bar i:nth-child(3) { background: var(--ochre); opacity: .8; border-left: 1px solid var(--hair-strong); }
+    .gauge-marks { display: grid; grid-template-columns: 3fr 2fr 2fr; margin-top: 9px; color: var(--ink-soft); font: 600 clamp(10px, calc(.82 * var(--u)), 14px)/1 var(--mono); letter-spacing: .09em; text-transform: uppercase; }
+    .gauge-marks span + span { padding-left: 10px; }
+
+    /* ---- branch map ---- */
+    .branch { position: relative; flex: 1; min-height: 0; margin-top: 10px; }
+    .line { position: absolute; left: 7em; right: 4%; height: 1px; background: var(--hair-strong); }
+    .line.main { top: 26%; }
+    .line.work { top: 62%; left: 24%; height: 2px; background: var(--pine); opacity: .6; }
+    .tick { position: absolute; left: 24%; top: 26%; width: 1px; height: 36%; background: var(--hair-strong); transform: skewX(-22deg); transform-origin: top; }
+    .node { position: absolute; width: 11px; height: 11px; margin: -5px 0 0 -5px; border-radius: 50%; background: var(--pine); }
+    .node.base { left: 24%; top: 26%; background: var(--indigo); }
+    .node.a { left: 42%; top: 62%; }
+    .node.b { left: 62%; top: 62%; }
+    .node.c { left: 82%; top: 62%; }
+    .node::after { content: attr(data-label); position: absolute; left: -1px; top: 18px; width: 12em; color: var(--ink-soft); font-size: clamp(11px, calc(.88 * var(--u)), 15px); }
+    .branch-label { position: absolute; left: 0; color: var(--ink-faint); font: 600 clamp(11px, calc(.88 * var(--u)), 14px)/1 var(--mono); letter-spacing: .06em; }
+    .branch-label.main { top: calc(26% - 6px); }
+    .branch-label.work { top: calc(62% - 6px); left: 0; color: var(--pine); }
+    .stop { position: absolute; right: 0; bottom: 0; max-width: 26em; padding-left: 16px; border-left: 2px solid var(--ochre); color: var(--ink-soft); font-size: clamp(12px, calc(.98 * var(--u)), 17px); line-height: 1.45; }
+
+    /* ---- app mock ---- */
+    .mock { display: flex; flex-direction: column; justify-content: center; }
+    .mock h3 { margin: 0 0 14px; font-family: var(--serif); font-size: clamp(19px, calc(1.65 * var(--u)), 28px); font-weight: 600; }
+    .post { display: grid; grid-template-columns: 3.4em 1fr auto; gap: 14px; align-items: center; padding: 11px 0; border-top: 1px solid var(--hair); }
+    .thumb { height: 2.6em; background: var(--indigo); opacity: .22; }
+    .thumb.b { background: var(--pine); opacity: .26; }
+    .thumb.c { background: var(--ochre); opacity: .3; }
+    .post strong { display: block; font-size: clamp(13px, calc(1.06 * var(--u)), 18px); font-weight: 650; }
+    .post span { color: var(--ink-soft); font-size: clamp(11.5px, calc(.9 * var(--u)), 15px); }
+    .post em { font-style: normal; color: var(--pine); font: 600 clamp(12px, calc(1 * var(--u)), 17px)/1 var(--mono); }
+    .mock-foot { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--hair-strong); }
+    .mock-foot strong { font-size: clamp(13px, calc(1.06 * var(--u)), 18px); font-weight: 650; }
+    .mock-foot span { color: var(--ink-faint); font-size: clamp(11.5px, calc(.9 * var(--u)), 15px); }
+
+    /* ---- six moments ---- */
+    .moments { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(18px, calc(2.2 * var(--u)), 38px) clamp(22px, calc(2.8 * var(--u)), 50px); align-content: center; flex: 1; }
+    .moment { padding-top: 13px; border-top: 1px solid var(--hair-strong); }
+    .moment b { color: var(--ink-faint); font: 600 clamp(10px, calc(.8 * var(--u)), 13px)/1 var(--mono); letter-spacing: .1em; }
+    .moment strong { display: block; margin: 10px 0 6px; font-family: var(--serif); font-size: clamp(16px, calc(1.36 * var(--u)), 23px); font-weight: 600; line-height: 1.16; }
+    .moment p { margin: 0; color: var(--ink-soft); font-size: clamp(12px, calc(.96 * var(--u)), 16px); line-height: 1.42; }
+    .moment.key { border-top-color: var(--pine); border-top-width: 2px; }
+    .moment.key b { color: var(--pine); }
+
+    /* ---- figures ---- */
+    .figures { display: flex; flex-direction: column; justify-content: center; }
+    .figure { display: grid; grid-template-columns: 2.6em 1fr; gap: 16px; align-items: baseline; padding: clamp(10px, 1.4vh, 16px) 0; border-top: 1px solid var(--hair); }
+    .figure:first-child { border-top: 0; padding-top: 0; }
+    .figure b { color: var(--ochre); font: 600 clamp(17px, calc(1.5 * var(--u)), 25px)/1 var(--mono); border-bottom: 1px dashed var(--ochre); padding-bottom: 4px; text-align: center; }
+    .figure span { color: var(--ink-soft); font-size: clamp(12px, calc(.98 * var(--u)), 17px); line-height: 1.35; }
+
+    /* ---- fit / avoid ---- */
+    .scale { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(30px, calc(4.4 * var(--u)), 78px); flex: 1; min-height: 0; }
+    .scale-side { display: flex; flex-direction: column; justify-content: center; padding-top: 14px; border-top: 2px solid var(--pine); }
+    .scale-side.no { border-top-color: var(--ochre); }
+    .scale-side > b { color: var(--pine); font: 600 clamp(10px, calc(.78 * var(--u)), 13px)/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+    .scale-side.no > b { color: var(--ochre); }
+    .scale-side h3 { margin: 12px 0 14px; font-family: var(--serif); font-size: clamp(19px, calc(1.6 * var(--u)), 27px); font-weight: 600; }
+    .scale-side p { padding: clamp(9px, 1.3vh, 15px) 0; border-top: 1px solid var(--hair); color: var(--ink-soft); font-size: clamp(13px, calc(1.04 * var(--u)), 18px); line-height: 1.4; }
+
+    /* ---- pull line ---- */
+    .pull {
+      margin-top: clamp(20px, 3vh, 40px);
+      padding-top: clamp(18px, 2.6vh, 32px);
+      border-top: 1px solid var(--hair-strong);
+      max-width: 18em;
+      font-family: var(--serif);
+      font-size: clamp(21px, calc(2.1 * var(--u)), 35px);
+      line-height: 1.2;
+      letter-spacing: -.012em;
+    }
+
+    /* ---- closing ---- */
+    .cta { align-self: center; padding: clamp(22px, calc(2.4 * var(--u)), 38px); background: var(--panel); border: 1px solid var(--hair); border-left: 2px solid var(--pine); }
+    .cta b { color: var(--pine); font: 600 clamp(10px, calc(.78 * var(--u)), 13px)/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+    .cta strong { display: block; margin: 12px 0 9px; font-family: var(--serif); font-size: clamp(20px, calc(1.7 * var(--u)), 29px); font-weight: 600; }
+    .cta p { margin: 0; color: var(--ink-soft); font-size: clamp(12.5px, calc(1.02 * var(--u)), 17px); line-height: 1.45; }
+
+    /* ---- extended route ---- */
+    .extended-badge {
+      display: inline-block; margin-top: 14px;
+      color: var(--indigo);
+      font: 600 clamp(10px, calc(.78 * var(--u)), 13px)/1 var(--mono);
+      letter-spacing: .14em; text-transform: uppercase;
+    }
+    body[data-mode="30"] [data-extended] { display: none !important; }
+
+    /* ---- chrome ---- */
+    .controls {
+      position: fixed; left: 50%; bottom: 14px; z-index: 20;
+      display: flex; align-items: center; gap: 2px;
+      transform: translateX(-50%);
+      padding: 4px;
+      border: 1px solid var(--hair-strong);
+      border-radius: 3px;
+      background: var(--sheet);
+      opacity: .5;
+      transition: opacity .2s ease;
+    }
+    .controls:hover, .controls:focus-within { opacity: 1; }
+    .control-btn { min-width: 34px; height: 28px; padding: 0 10px; border: 0; border-radius: 2px; background: transparent; color: var(--ink-soft); font-size: 12px; font-weight: 600; cursor: pointer; }
+    .control-btn:hover, .control-btn:focus-visible { outline: none; color: var(--ink); background: rgba(27,34,31,.08); }
+    .slide-count { min-width: 54px; color: var(--ink-faint); text-align: center; font: 600 11px/1 var(--mono); letter-spacing: .06em; }
+
+    .progress-track { position: fixed; left: 0; right: 0; bottom: 0; z-index: 22; height: 2px; background: rgba(27,34,31,.1); }
+    .progress-bar { height: 100%; width: 0; background: var(--ink); opacity: .5; transition: width .3s var(--ease); }
+
+    .notes-panel {
+      position: fixed; z-index: 40; right: 18px; top: 18px; bottom: 56px;
+      width: min(420px, calc(100vw - 36px));
+      overflow: auto;
+      padding: 26px 28px;
+      border: 1px solid var(--hair-strong);
+      background: var(--sheet);
+      box-shadow: 0 16px 44px rgba(27,34,31,.2);
+    }
+    .notes-panel[hidden] { display: none; }
+    .notes-panel h2 { margin-bottom: 16px; font-size: 24px; }
+    .notes-panel p, .notes-panel li { color: var(--ink-soft); font-size: 15px; line-height: 1.55; }
+    .notes-panel strong { color: var(--ink); }
+    .notes-close { position: absolute; right: 16px; top: 15px; border: 0; background: transparent; color: var(--ink-faint); font-size: 13px; cursor: pointer; }
+
+    .speaker-notes { display: none; }
+
+    .overview { position: fixed; inset: 0; z-index: 50; overflow: auto; padding: 48px; background: var(--field); }
+    .overview[hidden] { display: none; }
+    .overview-head { display: flex; align-items: center; justify-content: space-between; max-width: 1280px; margin: 0 auto 26px; }
+    .overview-head h2 { margin: 0; font-size: 32px; }
+    .overview-close { border: 1px solid var(--hair-strong); border-radius: 3px; background: transparent; color: var(--ink-soft); padding: 8px 13px; cursor: pointer; }
+    .overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; max-width: 1280px; margin: 0 auto; }
+    .overview-card { position: relative; min-height: 140px; padding: 20px; border: 1px solid var(--hair); background: var(--sheet); color: var(--ink); text-align: left; cursor: pointer; }
+    .overview-card:hover, .overview-card:focus-visible { outline: none; border-color: var(--ink); }
+    .overview-card b { color: var(--ink-faint); font: 600 11px/1 var(--mono); letter-spacing: .08em; }
+    .overview-card strong { display: block; margin-top: 26px; font-family: var(--serif); font-size: 19px; font-weight: 600; line-height: 1.22; }
+    .overview-card.current { border-color: var(--pine); border-left-width: 3px; }
+
+    .toast {
+      position: fixed; z-index: 70; left: 50%; bottom: 60px;
+      transform: translate(-50%, 10px);
+      padding: 9px 14px;
+      border: 1px solid var(--hair-strong);
+      background: var(--ink); color: var(--sheet);
+      font-size: 13px;
+      opacity: 0; pointer-events: none;
+      transition: opacity .2s ease, transform .2s ease;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    .sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0,0,0,0) !important; white-space: nowrap !important; border: 0 !important; }
+
+    /* ---- compact landscape: 16:9 is kept, dense grids loosen ---- */
+    @media (max-width: 1180px) {
+      .band { grid-template-columns: 10em repeat(3, 1fr); }
+      .lanes { grid-template-columns: 1fr 1.2fr 1fr; }
+      .field { grid-template-columns: 7em 1fr; }
+    }
+
+    /* ---- dense text slides in a shallow box ---- */
+    @media (max-height: 800px), (max-width: 1180px) {
+      .field { padding: 8px 0; gap: 12px; }
+      .issue h3 { margin-bottom: 12px; }
+      .questions p { padding: clamp(8px, 1.2vh, 15px) 0; }
+      .rail-item { gap: 3px; }
+    }
+
+    /* ---- phones and small tablets: a scrolling document, not a slide box ---- */
+    @media (max-width: 860px) {
+      html, body { height: auto; overflow-x: hidden; overflow-y: auto; }
+      body { min-height: 100%; }
+      .deck { position: static; inset: auto; }
+      .slide {
+        position: static; inset: auto;
+        display: none; place-items: stretch;
+        visibility: visible; opacity: 1; pointer-events: auto; transition: none;
+      }
+      .slide.active { display: block; }
+
+      .slide-inner {
+        --u: 0px;
+        width: 100%;
+        aspect-ratio: auto;
+        min-height: 100svh;
+        overflow: visible;
+        padding: 18px 18px 104px;
+        border: 0;
+        box-shadow: none;
+      }
+      .slide-content { padding-top: 20px; }
+
+      h1 { font-size: 33px; max-width: none; margin-bottom: 18px; }
+      h2 { font-size: 25px; max-width: none; margin-bottom: 18px; }
+      .lead { font-size: 17px; max-width: none; }
+      .note { max-width: none !important; }
+      .pull { font-size: 20px; max-width: none; margin-top: 20px; padding-top: 18px; }
+      .foot { margin-top: 26px; padding-top: 14px; border-top: 1px solid var(--hair); }
+
+      .cols, .cols.even, .cols.wide-left, .cols.wide-right, .cols.narrow-right,
+      .roles, .lanes, .moments, .chain, .scale, .band, .figures {
+        grid-template-columns: 1fr; gap: 24px;
+      }
+      .band { gap: 14px; margin-top: 26px; padding-top: 16px; }
+      .mid, .questions, .issue, .mock, .figures, .lane, .scale-side {
+        justify-content: flex-start;
+      }
+      .lanes, .moments, .scale, .cols, .branch { flex: 0 0 auto; min-height: 0; }
+
+      .steps { grid-template-columns: 1fr 1fr; gap: 18px 14px; margin-top: 24px; }
+      .steps::before { display: none; }
+      .step { padding-right: 0; }
+      .step strong { margin-top: 26px; }
+      .phases { grid-template-columns: 1fr 1fr; margin: 24px 0 0; }
+      .phase.two { margin-left: 12px; }
+
+      .field { grid-template-columns: 1fr; gap: 3px; padding: 12px 0; }
+      .panel { padding: 18px 16px; }
+      .prompt { padding: 16px 14px; }
+      .tdd span { padding: 7px 0; }
+
+      /* branch map redrawn as a fixed vertical schematic */
+      .branch { position: relative; height: 306px; margin-top: 16px; }
+      .branch-label { font-size: 11px; }
+      .branch-label.main { top: 2px; left: 0; }
+      .branch-label.work { top: 88px; left: 0; }
+      .line { left: 0; right: 0; }
+      .line.main { top: 32px; left: 3.4em; }
+      .line.work { top: 122px; left: 0; }
+      .tick { left: 3.7em; top: 32px; height: 90px; transform: none; }
+      .node.base { left: 3.7em; top: 32px; }
+      .node.a { left: 4%; top: 122px; }
+      .node.b { left: 42%; top: 122px; }
+      .node.c { left: 80%; top: 122px; }
+      .node::after { top: 15px; width: 6.2em; font-size: 10.5px; line-height: 1.3; }
+      .node.base::after { left: -3.2em; width: 7em; }
+      .node.c::after { left: auto; right: -2px; text-align: right; }
+      .stop { position: absolute; left: 0; right: auto; top: 196px; bottom: auto; max-width: none; }
+
+      .cta { align-self: stretch; padding: 20px 18px; }
+      .cta strong { font-size: 20px; }
+
+      .controls { bottom: 10px; gap: 0; opacity: .96; }
+      .control-btn { min-width: 30px; height: 34px; padding: 0 7px; }
+      .slide-count { min-width: 46px; }
+      .notes-panel { left: 10px; right: 10px; top: 10px; bottom: 60px; width: auto; padding: 20px 18px; }
+      .overview-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 420px) {
+      .slide-inner { padding-left: 15px; padding-right: 15px; }
+      h1 { font-size: 29px; }
+      h2 { font-size: 23px; }
+      .post { grid-template-columns: 2.6em 1fr auto; gap: 10px; }
+    }
+
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    }
+
+    @media print {
+      @page { size: 13.333in 7.5in; margin: 0; }
+      html, body { width: auto; height: auto; overflow: visible; background: var(--sheet); print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .deck { position: static; }
+      .controls, .progress-track, .notes-panel, .overview, .toast { display: none !important; }
+      .slide, .slide.active {
+        position: relative; inset: auto;
+        width: 13.333in; height: 7.5in;
+        visibility: visible; opacity: 1;
+        page-break-after: always; break-after: page;
+        pointer-events: auto;
+      }
+      .slide-inner { width: 13.333in; height: 7.5in; border: 0; box-shadow: none; }
+      body[data-mode="30"] [data-extended] { display: none !important; }
+    }
+
+  </style>
+</head>
+<body data-mode="30">
+  <a class="skip-link" href="#slide-1">Skip to presentation</a>
+
+  <main class="deck" id="deck" aria-label="Agentic development presentation">
+    <section class="slide active" id="slide-1" data-title="One planner, many executors" aria-hidden="false">
+      <div class="slide-inner">
+        <header class="runner"><span>A field guide for developers</span><em>01</em></header>
+        <div class="slide-content">
+          <div class="cover">
+            <h1>One planner, many executors, proof outside the chat</h1>
+            <p class="lead">How a design conversation becomes reviewed GitHub issues, test-first subagent work, and commits that someone other than the author signed off on.</p>
+            <div class="chain">
+              <div class="chain-node"><b>Plan</b><strong>Decide first</strong><span>Design settles before code starts.</span></div>
+              <div class="chain-node"><b>Build</b><strong>One issue at a time</strong><span>Scoped work, tests written first.</span></div>
+              <div class="chain-node"><b>Prove</b><strong>Someone else signs off</strong><span>Verified against a contract.</span></div>
+            </div>
+          </div>
+          <p class="foot">30–45 minutes. The workflow, a recorded build session, and the app we are all running on the trip.</p>
+        </div>
+      </div>
+      <aside class="speaker-notes">
+        <p><strong>Timing:</strong> 1 minute.</p>
+        <p>Open with the premise: this is a workflow report from my own projects, not a benchmark and not a mandate.</p>
+        <p>Tell them the three roles are the thing to watch. Model names are the least transferable part of this talk.</p>
+        <p>Promise the proof up front: Caravan, the app running our trip next week, was built this way, and we are going to read the session that built it.</p>
+      </aside>
+    </section>
+
+    <section class="slide" id="slide-2" data-title="The problem" aria-hidden="true">
+      <div class="slide-inner">
+        <header class="runner"><span>The problem</span><em>02</em></header>
+        <div class="slide-content">
+          <div class="cols wide-left">
+            <div class="mid">
+              <h2>One long agent session carries too many jobs</h2>
+              <p class="lead">Ideation, architecture, implementation, review, and project memory all compete for the same context window.</p>
+              <p class="pull">The executor should not need every planning tangent to change one coherent slice.</p>
+            </div>
+            <div class="rail">
+              <div class="rail-item"><strong>Code starts before decisions settle</strong><span>The first plausible design quietly becomes the implementation.</span></div>
+              <div class="rail-item"><strong>Missing states surface late</strong><span>UX and domain questions come back as code churn a week later.</span></div>
+              <div class="rail-item"><strong>Context turns into residue</strong><span>Abandoned branches of thought sit next to current decisions.</span></div>
+              <div class="rail-item"><strong>Self-review becomes trust</strong><span>The context that wrote the code is the one declaring it finished.</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <aside class="speaker-notes">
+        <p><strong>Timing:</strong> 2 minutes.</p>
+        <p>Give one concrete example from your own work where implementation started before a data-model decision was stable. Keep it short and anonymized.</p>
+        <p>Land the fourth point hardest. Self-review is the failure that is hardest to notice, because the output always looks confident.</p>
+        <p>The workflow answers this by separating responsibility and moving decisions into artifacts that live outside the conversation.</p>
+      </aside>
+    </section>
+
+    <section class="slide" id="slide-3" data-title="Three roles, one developer" aria-hidden="true">
+      <div class="slide-inner">
+        <header class="runner"><span>The shape of it</span><em>03</em></header>
+        <div class="slide-content">
+          <h2>Three roles, one developer, and state that outlives the chat</h2>
+          <div class="roles">
+            <div class="role">
+              <b>Planner</b>
+              <strong>Opus</strong>
+              <p>Interrogates the design, reconciles it with the repository, then writes the issues.</p>
+              <em>Holds decisions and trade-offs. Holds no implementation detail.</em>
+            </div>
+            <div class="role exec">
+              <b>Executor</b>
+              <strong>Subagent</strong>
+              <p>Takes one issue, writes the failing test first, implements, and reports back. Never commits.</p>
+              <em>Starts with a fresh context window and never sees the planning transcript.</em>
+            </div>
+            <div class="role verify">
+              <b>Verifier</b>
+              <strong>Opus, again</strong>
+              <p>Reads the diff against each acceptance criterion, runs the suite, commits, closes the issue.</p>
+              <em>Judges work it did not write, against a contract it wrote earlier.</em>
+            </div>
+          </div>
+          <div class="band">
+            <b>What survives compaction</b>
+            <div><strong>GitHub issues</strong><span>the contract</span></div>
+            <div><strong>Git history</strong><span>the checkpoint</span></div>
+            <div><strong>Test suite</strong><span>the evidence</span></div>
+          </div>
+          <p class="foot">All of this runs on the Claude Code plan you already have. The models are swappable; the boundaries are the point.</p>
+        </div>
+      </div>
+      <aside class="speaker-notes">
+        <p><strong>Timing:</strong> 2 minutes.</p>
+        <p>The verifier and the planner are the same model in the same session, but they are doing genuinely different jobs at different times, against a contract written before the code existed.</p>
+        <p>Emphasize the fresh context window on the executor. That is the real delegation benefit: implementation detail, failed attempts, and test output never land in the orchestrator's window.</p>
+        <p>If someone asks about other vendors' models, say there is a slide at the end and keep moving.</p>
+      </aside>
+    </section>
+
+    <section class="slide" id="slide-4" data-title="The complete workflow" aria-hidden="true">
+      <div class="slide-inner">
+        <header class="runner"><span>The complete workflow</span><em>04</em></header>
+        <div class="slide-content">
+          <h2>Decisions move into artifacts before code moves</h2>
+          <div class="steps" role="img" aria-label="Seven steps: think, grill, reconcile, issue, execute, verify, report.">
+            <div class="step"><b>01</b><strong>Think</strong><span>Bring a design position</span></div>
+            <div class="step"><b>02</b><strong>Grill</strong><span>Surface missing decisions</span></div>
+            <div class="step"><b>03</b><strong>Reconcile</strong><span>Fit the codebase</span></div>
+            <div class="step"><b>04</b><strong>Issue</strong><span>Write execution contracts</span></div>
+            <div class="step"><b>05</b><strong>Execute</strong><span>One subagent, one issue</span></div>
+            <div class="step"><b>06</b><strong>Verify</strong><span>Tests and independent review</span></div>
+            <div class="step"><b>07</b><strong>Report</strong><span>Behavior and direction</span></div>
+          </div>
+          <div class="phases">
+            <p class="phase">Design phase</p>
+            <p class="phase two">Delivery phase</p>
+          </div>
+        </div>
+      </div>
+      <aside class="speaker-notes">
+        <p><strong>Timing:</strong> 2 minutes.</p>
+        <p>Walk the line once without detail, then name the two boundaries that matter: the reviewed issue between design and delivery, and verified tests before any commit or closure.</p>
+        <p>Compaction sits between step four and step five. It is only safe there because the decisions have already moved into GitHub.</p>
+        <p>If the issue body cannot stand on its own, compaction is premature. That is the test.</p>
+      </aside>
+    </section>
+
+    <section class="slide" id="slide-5" data-title="The pre-prompt brief" aria-hidden="true">
+      <div class="slide-inner">
+        <header class="runner"><span>Thinking before prompting</span><em>05</em></header>
+        <div class="slide-content">
+          <div class="cols wide-right">
+            <div class="mid">
+              <h2>Bring a position the planner can attack</h2>
+              <p class="note" style="max-width:22em;">Asking a model to invent the product from a blank page wastes the thing it is best at.</p>
+            </div>
+            <div class="rail numbered">
+              <div class="rail-item"><b>01</b><strong>Outcome and non-goals</strong><span>What changes for the person using it, and what stays untouched?</span></div>
+              <div class="rail-item"><b>02</b><strong>Domain and data</strong><span>Which concepts, rules, ownership, and lifecycles actually exist?</span></div>
+              <div class="rail-item"><b>03</b><strong>UX states</strong><span>What do empty, loading, success, error, and recovery look like?</span></div>
+              <div class="rail-item"><b>04</b><strong>Failure behavior</strong><span>Retries, partial work, invalid input, someone closing the tab.</span></div>
+              <div class="rail-item"><b>05</b><strong>Codebase fit</strong><span>Where should this live, and which existing boundaries matter?</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <aside class="speaker-notes">
+        <p><strong>Timing:</strong> 2 minutes.</p>
+        <p>This is your own thinking pass, before any prompt. The planner is far more useful when it receives a proposal with explicit trade-offs than when it receives a wish.</p>
+        <p>Do not polish the brief into false certainty. Mark what you feel strongly about and what you want challenged, so the grilling has somewhere to go.</p>
+        <p>For Caravan, this pass produced a one-page note: a roster from the directory, a roll call at every stop, activity polls, and one hard rule — the app never authorizes a departure, it only speeds up the leader&rsquo;s check.</p>
+      </aside>
+    </section>
+
+    <section class="slide" id="slide-6" data-title="The grilling phase" aria-hidden="true">
+      <div class="slide-inner">
+        <header class="runner"><span>Planner role</span><em>06</em></header>
+        <div class="slide-content">
+          <h2>The grilling phase</h2>
+          <div class="cols even">
+            <div class="mid">
+              <div class="prompt" id="grillPrompt">Read my design and inspect the repository.
+
+Grill me one high-value question at a time. Focus on domain ambiguity, missing UX states, failure behavior, testability, and conflicts with the existing codebase.
+
+Do not implement anything or create issues yet.<button class="copy-btn" type="button" data-copy="grillPrompt">Copy</button></div>
+            </div>
+            <div class="questions">
+              <p>Does a member check themselves in, or does the bus leader mark them?</p>
+              <p>What happens when someone swaps buses at a stop?</p>
+              <p>Does the app authorize the departure, or only report what the leader marked?</p>
+              <p>Who is the source of truth when the leader&rsquo;s phone has no signal and a member&rsquo;s does?</p>
+              <p class="note" style="border:0;padding-top:16px;">Output: resolved decisions, explicit unknowns, non-goals, and codebase constraints.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <aside class="speaker-notes">
+        <p><strong>Timing:</strong> 3 minutes.</p>
+        <p>Stress the pacing. One question at a time. A list of twenty questions invites shallow answers and hides the moment when one answer invalidates an earlier decision.</p>
+        <p>These four are real questions from the Caravan session. The third one changed the product: it demoted the app from authority to advisory, which removed an entire class of liability and made the readiness rule something a pure function could own.</p>
+        <p>The planner must inspect the repository before it declares the design ready. An elegant plan can still be wrong for this codebase.</p>
+      </aside>
+    </section>
+
+    <section class="slide" id="slide-7" data-title="Issues as execution contracts" aria-hidden="true">
+      <div class="slide-inner">
+        <header class="runner"><span>The durable handoff</span><em>07</em></header>
+        <div class="slide-content">
+          <div class="cols wide-left">
+            <div class="panel issue">
+              <h3>#7 — Departure readiness for a bus roll call</h3>
+              <div class="field"><b>Outcome</b><span>The bus leader gets one unambiguous answer &mdash; blocked or clear &mdash; and the name of every member still unaccounted for. Excused members never block a departure, and never disappear from the list.</span></div>
+              <div class="field"><b>Scope</b><span>One pure readiness function and its unit tests. No interface, no storage, no sync, no notifications.</span></div>
+              <div class="field"><b>Acceptance</b><span>Covers an empty roster, a member with no mark at all, an excused member, a member reassigned to another bus mid-trip, and a leader mark overriding a stale self check-in.</span></div>
+              <div class="field"><b>Evidence</b><span>Show a failing test for the excused-member rule first, then the focused suite, then the full suite.</span></div>
+              <div class="field"><b>Non-goals</b><span>Push notifications, offline sync, location, polls, the photo feed, and anything that reads as the app granting permission to leave.</span></div>
+            </div>
+            <div class="rail">
+              <div class="rail-item"><strong>It survives compaction</strong><span>An executor can start from this alone, with no planning transcript and no prior session.</span></div>
+              <div class="rail-item"><strong>Non-goals hold the line</strong><span>Without them the executor will helpfully build the awards too, and the sprint grows a day.</span></div>
+              <div class="rail-item"><strong>Evidence defines done</strong><span>The verifier gets something concrete to challenge instead of a claim to accept.</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <aside class="speaker-notes">
+        <p><strong>Timing:</strong> 3 minutes.</p>
+        <p>This is the interface between planner and executor. It states behavior, boundaries, and proof. It deliberately does not prescribe the implementation.</p>
+        <p>Read the acceptance list aloud. Every item there came out of the grilling phase, not out of my original brief.</p>
+        <p>Review every issue yourself before execution. This is the last cheap place to catch a wrong decision.</p>
+      </aside>
+    </section>
+
+    <section class="slide" id="slide-8" data-title="The implementation loop" aria-hidden="true">
+      <div class="slide-inner">
+        <header class="runner"><span>One issue at a time</span><em>08</em></header>
+        <div class="slide-content">
+          <h2>The implementation loop</h2>
+          <div class="lanes">
+            <div class="lane">
+              <b>Opus, planner</b>
+              <div class="act"><strong>Read the issue</strong><p>Confirm scope and current repository state.</p></div>
+              <div class="act"><strong>Assign one subagent</strong><p>Send the issue text and an explicit test-first contract.</p></div>
+            </div>
+            <div class="lane exec">
+              <b>Subagent, executor</b>
+              <div class="tdd"><span>Red</span><span>Green</span><span>Refactor</span></div>
+              <div class="act"><strong>Stay inside the issue</strong><p>Implement, run focused tests, and do not commit anything.</p></div>
+              <div class="act"><strong>Report evidence</strong><p>Files changed, test output, assumptions made, risks noticed.</p></div>
+            </div>
+            <div class="lane verify">
+              <b>Opus, verifier</b>
+              <div class="act"><strong>Challenge the report</strong><p>Read the diff against every acceptance criterion.</p></div>
+              <div class="act"><strong>Record completion</strong><p>Run the full suite, make one commit, close the issue.</p></div>
+            </div>
+          </div>
+          <p class="foot">The next issue starts only after the current one closes. A new subagent means a new context window.</p>
+        </div>
+      </div>
+      <aside class="speaker-notes">
+        <p><strong>Timing:</strong> 3 minutes.</p>
+        <p>The subagent does not commit. That reserves the durable action for the orchestrator, and only after independent verification.</p>
+        <p>Test-first gives you a visible proof obligation. The red test should fail because the behavior is missing, not because the harness is broken. That distinction is worth saying out loud.</p>
+        <p>Sequential execution protects your ability to understand the branch. Parallel subagents are useful later, and only when the issues are genuinely independent.</p>
+      </aside>
+    </section>
+
+    <section class="slide" id="slide-9" data-title="Right-sizing the session" aria-hidden="true">
+      <div class="slide-inner">
+        <header class="runner"><span>Right-sizing the session</span><em>09</em></header>
+        <div class="slide-content">
+          <div class="cols wide-right">
+            <div class="mid">
+              <h2>Context is a sprint budget</h2>
+              <div class="gauge">
+                <div class="gauge-bar" role="img" aria-label="A context budget running from healthy through refresh soon to re-plan."><i></i><i></i><i></i></div>
+                <div class="gauge-marks"><span>Healthy</span><span>Refresh soon</span><span>Re-plan</span></div>
+              </div>
+              <p class="note" style="max-width:24em;">Judgment degrades before output does. The orchestrator stops noticing problems well before it stops producing confident answers.</p>
+            </div>
+            <div class="rail numbered">
+              <div class="rail-item"><b>01</b><strong>Count dependencies, not issues</strong><span>Three coupled issues can cost more context than six isolated slices.</span></div>
+              <div class="rail-item"><b>02</b><strong>Watch verification residue</strong><span>Failed attempts and cross-cutting fixes stay with the orchestrator, not the subagent.</span></div>
+              <div class="rail-item"><b>03</b><strong>Refresh after a small coherent batch</strong><span>Restart from issues, commits, and test output. Nothing important lives in the transcript.</span></div>
+              <div class="rail-item"><b>04</b><strong>Stop when judgment gets expensive</strong><span>Repeated regressions or moving issue boundaries are a planning problem, not a context problem.</span></div>
+              <div data-extended>
+                <p class="extended-badge">45-minute detail</p>
+                <p class="note" style="margin-top:8px;">Use issue count as a ceiling, then lower it as coupling or verification cost rises.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <aside class="speaker-notes">
+        <p><strong>Timing:</strong> 2 minutes on the 30-minute route, 4 on the 45.</p>
+        <p>There is no universal issue count. Pick a conservative ceiling, then watch how much branch state, failed approaches, and cross-issue reasoning the orchestrator has to keep holding.</p>
+        <p>My working heuristic: refresh after two or three non-trivial issues, or immediately after a verification failure that changes the plan. Starting point, not a benchmark.</p>
+        <p>Fill in your own numbers from the Caravan build log before presenting.</p>
+      </aside>
+    </section>
+
+    <section class="slide" id="slide-10" data-title="Branch discipline and stop conditions" aria-hidden="true">
+      <div class="slide-inner">
+        <header class="runner"><span>Branch discipline</span><em>10</em></header>
+        <div class="slide-content">
+          <h2>Safety and recovery controls</h2>
+          <div class="branch" role="img" aria-label="A working branch off main, with one commit per closed issue, ending at a review-ready state.">
+            <div class="line main"></div>
+            <div class="line work"></div>
+            <div class="tick"></div>
+            <span class="branch-label main">main</span>
+            <span class="branch-label work">feature/caravan-rollcall</span>
+            <span class="node base" data-label="branch from main"></span>
+            <span class="node a" data-label="#7 readiness closed"></span>
+            <span class="node b" data-label="#8 reassignment closed"></span>
+            <span class="node c" data-label="ready for review"></span>
+            <p class="stop">Stop on a design conflict, a destructive action, a repeated regression, or any change that crosses the active issue boundary.</p>
+          </div>
+        </div>
+      </div>
+      <aside class="speaker-notes">
+        <p><strong>Timing:</strong> 1 minute on the 30-minute route, 3 on the 45.</p>
+        <p>Work on a branch cut from main. Keep it clean before orchestration starts, and make each commit correspond to exactly one closed issue. That gives you a recoverable checkpoint before the next executor begins.</p>
+        <p>Focused tests first for fast feedback, full suite before committing. If the full suite fails, the issue stays open. No exceptions, because the exception is how the discipline dies.</p>
+        <p>Write your stop conditions before the run, not during it.</p>
+      </aside>
+    </section>
+
+    <section class="slide" id="slide-11" data-title="Caravan: the demo app" aria-hidden="true">
+      <div class="slide-inner">
+        <header class="runner"><span>The demo, part one</span><em>11</em></header>
+        <div class="slide-content">
+          <h2>Caravan, the app running our trip</h2>
+          <div class="cols even">
+            <div class="panel mock">
+              <p class="panel-label">Caravan — roll call, Bus 2 at the Bhurban stop</p>
+              <div class="post"><div class="thumb"></div><div><strong>Ayesha Tariq</strong><span>Checked in at 14:02</span></div><em>&check;</em></div>
+              <div class="post"><div class="thumb b"></div><div><strong>Bilal Haider</strong><span>Marked present by leader</span></div><em>&check;</em></div>
+              <div class="post"><div class="thumb c"></div><div><strong>Hira Nadeem</strong><span>Excused &mdash; travelling with family</span></div><em>&ndash;</em></div>
+              <div class="mock-foot"><strong>2 still unaccounted for</strong><span>17 of 19 marked · leader decides</span></div>
+            </div>
+            <div class="rail">
+              <div class="rail-item"><strong>Sign in with your work Google account</strong><span>The roster comes from the directory. Nobody outside the workspace gets in.</span></div>
+              <div class="rail-item"><strong>Roster, itinerary, and packing list</strong><span>Which bus you are on, where we stop, and what to bring.</span></div>
+              <div class="rail-item"><strong>Roll call at every stop</strong><span>The leader marks one list instead of reading nineteen names out loud.</span></div>
+              <div class="rail-item"><strong>Polls that tally themselves</strong><span>Options go out, votes come back. Nobody relays numbers through three people.</span></div>
+              <div class="rail-item"><strong>Call times, photos, awards</strong><span>One tap to say you are up. The gallery and the last night take care of themselves.</span></div>
+            </div>
+          </div>
+          <p class="foot">Built with the workflow in this talk. Install it now — your bus and the full itinerary are already in there.</p>
+        </div>
+      </div>
+      <aside class="speaker-notes">
+        <p><strong>Timing:</strong> 3 minutes.</p>
+        <p>Get phones out here. Ask everyone to install it and sign in before you move on — it takes thirty seconds, and it makes the rest of the demo concrete rather than theoretical.</p>
+        <p>Say the advisory rule out loud: the app never says the bus can leave. It shows the leader what has been marked, and the leader decides. That was a design decision, not an oversight, and it came out of the grilling phase.</p>
+        <p>Point at the roll call and tell them you are about to watch the session where exactly that readiness rule was designed, specified, built, and rejected once.</p>
+        <p>Have the install link or QR ready on screen, and check that the roster synced before you present.</p>
+      </aside>
+    </section>
+
+    <section class="slide" id="slide-12" data-title="How the app was sliced" aria-hidden="true">
+      <div class="slide-inner">
+        <header class="runner"><span>The demo, part two</span><em>12</em></header>
+        <div class="slide-content">
+          <div class="cols wide-right">
+            <div class="mid">
+              <h2>One brief, cut into issues</h2>
+              <p class="note" style="max-width:22em;">Ordered by dependency, and by what actually earns the install. Each slice is independently shippable and independently testable.</p>
+              <p class="pull">The fun part was built last on purpose.</p>
+            </div>
+            <div class="rail numbered">
+              <div class="rail-item"><b>01</b><strong>Roster and itinerary</strong><span>Directory sync, bus assignment, stops. Almost no open decisions, so it went first.</span></div>
+              <div class="rail-item"><b>02</b><strong>Roll call</strong><span>Readiness, excused members, reassignment. The real design work, and the slice we are about to read.</span></div>
+              <div class="rail-item"><b>03</b><strong>Activity polls</strong><span>Quorum, ties, changing your vote, what closes a poll. Contested rules, clean slice.</span></div>
+              <div class="rail-item"><b>04</b><strong>Call times</strong><span>An acknowledgement board first. Push was specified as an enhancement, never a dependency.</span></div>
+              <div class="rail-item"><b>05</b><strong>Photos, gallery, awards</strong><span>Last, deliberately. By then everyone already had the app for reasons they could not skip.</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <aside class="speaker-notes">
+        <p><strong>Timing:</strong> 2 minutes on the 30-minute route, 3 on the 45.</p>
+        <p>This slide is the decomposition itself, and it is worth naming as a skill. The hard part of the workflow is not the prompting; it is cutting a brief into slices that can be finished, tested, and closed one at a time.</p>
+        <p>Say why the photo feed is last. A feature nobody has to open cannot carry adoption. Roll call and call times are mandatory, so they put the app on every phone, and the gallery gets used for free afterwards.</p>
+        <p>If someone asks why not build the fun thing first: it was the original plan, and it was wrong for exactly that reason. Being straightforward about the reversal is worth more than pretending the first plan was right.</p>
+      </aside>
+    </section>
+
+    <section class="slide" id="slide-13" data-title="Six moments from the session" aria-hidden="true">
+      <div class="slide-inner">
+        <header class="runner"><span>The demo, part three</span><em>13</em></header>
+        <div class="slide-content">
+          <h2>Six moments from the build session</h2>
+          <div class="moments">
+            <div class="moment"><b>01</b><strong>A question that changed the product</strong><p>“Does the app say the bus can go?” turned an authority into an instrument the leader reads.</p></div>
+            <div class="moment"><b>02</b><strong>An issue you can read cold</strong><p>No transcript, no prior context, still executable by someone who just arrived.</p></div>
+            <div class="moment"><b>03</b><strong>A test that fails for the right reason</strong><p>Red before green, and red because the excused rule is missing rather than the harness.</p></div>
+            <div class="moment"><b>04</b><strong>The evidence report</strong><p>Files changed, tests run, assumptions made, risks noticed — written by the executor.</p></div>
+            <div class="moment key"><b>05</b><strong>A report that didn't survive review</strong><p>The subagent said every criterion passed. The diff said otherwise. This is the one to watch.</p></div>
+            <div class="moment"><b>06</b><strong>The closing report</strong><p>What moved, where the codebase went, and what is still risky. No line-by-line detail.</p></div>
+          </div>
+          <p class="foot">We're reading a recorded session, not driving one live. Stop me anywhere.</p>
+        </div>
+      </div>
+      <aside class="speaker-notes">
+        <p><strong>Timing:</strong> 10 to 12 minutes on the 30-minute route, up to 17 on the 45.</p>
+        <p>Switch to the recorded session now. Move between these six marks rather than scrolling; a long transcript read end to end loses the room within two minutes.</p>
+        <p>Moment five is the point of the whole talk. If verification never rejects anything, it is a rubber stamp, and someone in this room will say so before you do. Say it first.</p>
+        <p>Leave the rework in. A flawless recording reads as cherry-picked and costs more credibility than the flaw does.</p>
+        <p>Take questions as you go rather than saving them. This segment is the part people actually want to interrogate.</p>
+      </aside>
+    </section>
+
+    <section class="slide" id="slide-14" data-title="What the session proved" aria-hidden="true">
+      <div class="slide-inner">
+        <header class="runner"><span>The demo, part four</span><em>14</em></header>
+        <div class="slide-content">
+          <h2>What that session actually proved</h2>
+          <div class="cols narrow-right">
+            <div class="rail marked">
+              <div class="rail-item yes"><b>✓</b><strong>Decisions moved before code did</strong><span>The readiness rule was settled in an issue, in writing, before a line of it existed.</span></div>
+              <div class="rail-item yes"><b>✓</b><strong>The failing test came first</strong><span>And it failed for the missing excused rule, not for a broken test setup.</span></div>
+              <div class="rail-item yes"><b>✓</b><strong>Verification rejected something</strong><span>Excused members were filtered while rendering, so a member with no mark at all fell off the screen and out of the count. The test asserted the visible list, so it passed anyway.</span></div>
+              <div class="rail-item no"><b>!</b><strong>The rework was a planning gap</strong><span>Mid-trip bus reassignment was never written down, so the executor invented a rule. The fix went into the issue, not into the code.</span></div>
+              <div class="rail-item yes"><b>✓</b><strong>Everything durable survived compaction</strong><span>Issues, commits, and test output. The conversation itself was disposable.</span></div>
+            </div>
+            <div class="figures">
+              <div class="figure"><b>—</b><span>issues closed</span></div>
+              <div class="figure"><b>—</b><span>orchestration sessions</span></div>
+              <div class="figure"><b>—</b><span>sent back for rework</span></div>
+              <div class="figure"><b>—</b><span>context refreshes</span></div>
+            </div>
+          </div>
+          <p class="foot">Figures from my own build log for Caravan.</p>
+        </div>
+      </div>
+      <aside class="speaker-notes">
+        <p><strong>Timing:</strong> 3 minutes.</p>
+        <p><strong>Before presenting: fill in the four dashed figures</strong> from your build log. Dashed boxes are placeholders and will look unfinished on a projector.</p>
+        <p>The third point is the one that earns the method. A verifier that never rejects anything is decoration.</p>
+        <p>The fourth point is the honest one. When execution goes wrong because the spec was vague, fix the spec. Patching the code teaches you nothing and the same gap returns next sprint.</p>
+      </aside>
+    </section>
+
+    <section class="slide" id="slide-15" data-title="Experience report" aria-hidden="true">
+      <div class="slide-inner">
+        <header class="runner"><span>Experience report</span><em>15</em></header>
+        <div class="slide-content">
+          <h2>Observed gains and real costs</h2>
+          <div class="scale">
+            <div class="scale-side">
+              <b>What improves for me</b>
+              <div class="rail" style="margin-top:14px;">
+                <div class="rail-item"><strong>Planning quality</strong><span>The planner spends its context on questions, trade-offs, and repository fit instead of syntax.</span></div>
+                <div class="rail-item"><strong>Context headroom</strong><span>Each subagent starts fresh, so implementation detail never lands in the orchestrator's window.</span></div>
+                <div class="rail-item"><strong>Reviewable work</strong><span>Something other than the author declares it finished, against a contract written earlier.</span></div>
+                <div class="rail-item"><strong>Durable progress</strong><span>Issues, tests, and commits outlive every compaction and every closed terminal.</span></div>
+              </div>
+            </div>
+            <div class="scale-side no">
+              <b>What the workflow costs</b>
+              <div class="rail" style="margin-top:14px;">
+                <div class="rail-item"><strong>Real orchestration time</strong><span>Issue review, handoff, and verification are work, and they are not free.</span></div>
+                <div class="rail-item"><strong>Verification eats the savings</strong><span>Reading diffs and failures fills the planner's window back up again.</span></div>
+                <div class="rail-item"><strong>Weak tests make it theatre</strong><span>Role separation only helps when the evidence actually means something.</span></div>
+                <div class="rail-item"><strong>It is slower on small work</strong><span>For a one-line fix, all of this is ceremony.</span></div>
+              </div>
+            </div>
+          </div>
+          <p class="foot">Observations from my own projects. Not a benchmark, and not a claim about which model is better.</p>
+        </div>
+      </div>
+      <aside class="speaker-notes">
+        <p><strong>Timing:</strong> 3 minutes.</p>
+        <p>Keep the claims personal and specific. Say “in my projects” rather than stating anything as a general property of the models.</p>
+        <p>Context headroom is the honest version of the benefit. Subagents get their own windows; that is real and it is measurable in how long a session stays coherent.</p>
+        <p>Give the cost column equal airtime. The room will trust the gains more if you are visibly unsentimental about the costs.</p>
+      </aside>
+    </section>
+
+    <section class="slide" id="slide-16" data-title="When the workflow fits" aria-hidden="true">
+      <div class="slide-inner">
+        <header class="runner"><span>Proportional process</span><em>16</em></header>
+        <div class="slide-content">
+          <h2>When this is worth it</h2>
+          <div class="scale">
+            <div class="scale-side">
+              <b>Worth the orchestration</b>
+              <h3>Run the full workflow</h3>
+              <p>The requirement still has unresolved product or domain decisions in it.</p>
+              <p>The change crosses interface, data, and business rules.</p>
+              <p>Tests can define a finish line you would actually believe.</p>
+              <p>The work splits into independent vertical slices.</p>
+            </div>
+            <div class="scale-side no">
+              <b>Use something lighter</b>
+              <h3>Skip the handoff</h3>
+              <p>A small, obvious patch costs less than the handoff does.</p>
+              <p>An urgent hotfix needs your own hands on it.</p>
+              <p>The repository has no test harness you would trust.</p>
+              <p>It is an exploratory spike with no stable definition of done.</p>
+            </div>
+          </div>
+          <p class="foot">The method earns its cost when ambiguity and verification risk exceed the orchestration overhead.</p>
+        </div>
+      </div>
+      <aside class="speaker-notes">
+        <p><strong>Timing:</strong> 2 minutes.</p>
+        <p>Say explicitly that a typo fix does not need a planner, an issue, an executor, and a verifier. Turning this into ceremony is the fastest way for a team to abandon it.</p>
+        <p>The sweet spot is a feature with real design work in it, a testable outcome, and slices that can be done one after another without integration chaos.</p>
+      </aside>
+    </section>
+
+    <section class="slide" id="slide-17" data-title="How to replicate it" aria-hidden="true">
+      <div class="slide-inner">
+        <header class="runner"><span>Adopt the roles, then customize</span><em>17</em></header>
+        <div class="slide-content">
+          <h2>Running this on the plan you already have</h2>
+          <div class="cols even">
+            <div class="rail numbered">
+              <div class="rail-item"><b>01</b><strong>Pick roles, not models</strong><span>Opus plans and verifies, subagents execute. Change either as evidence accumulates.</span></div>
+              <div class="rail-item"><b>02</b><strong>Standardize the issue contract</strong><span>Outcome, scope, acceptance, evidence, non-goals. Every issue, every time.</span></div>
+              <div class="rail-item"><b>03</b><strong>Standardize verification</strong><span>Focused tests, full suite, one commit per issue, then close.</span></div>
+              <div class="rail-item"><b>04</b><strong>Write stop conditions first</strong><span>Decide what halts the run before you are in the middle of one.</span></div>
+              <div class="rail-item"><b>05</b><strong>Run one small sprint and log it</strong><span>Track rework, issue quality, verification, and context pressure.</span></div>
+            </div>
+            <div class="mid">
+              <div class="prompt" id="plannerContract">Planner contract
+
+Grill this design one high-value question at a time. Inspect the repository before you propose any issues.<button class="copy-btn" type="button" data-copy="plannerContract">Copy</button></div>
+              <div class="prompt exec" id="executorContract" style="margin-top:18px;">Executor contract
+
+Implement exactly one issue, test first. Stay inside scope, run focused tests, do not commit, and report evidence.<button class="copy-btn" type="button" data-copy="executorContract">Copy</button></div>
+              <div data-extended>
+                <p class="extended-badge">45-minute detail</p>
+                <p class="note" style="margin-top:8px;">Useful extensions: hooks for deterministic safety or test gates, and browser tools when an issue needs interface or console evidence. Load browser tools on demand — they cost context.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <aside class="speaker-notes">
+        <p><strong>Timing:</strong> 3 minutes on the 30-minute route, 5 on the 45.</p>
+        <p>Everything on this slide runs on the standard company Claude Code setup. Nothing here needs a second subscription, a proxy, or anything you would have to expense.</p>
+        <p>Make the roles portable. Another planner, another executor, another issue tracker — all fine, as long as the boundaries and the evidence stay clear.</p>
+        <p>Claude Code hooks can run at lifecycle events such as PreToolUse, PostToolUse, and Stop. Good uses: blocking dangerous commands, formatting after edits, gating completion on tests.</p>
+        <p>Sources: <a href="https://docs.claude.com/en/docs/claude-code/hooks">Claude Code hooks</a> and the <a href="https://docs.claude.com/en/docs/claude-code/overview">Claude Code docs</a>.</p>
+      </aside>
+    </section>
+
+    <section class="slide" id="slide-18" data-title="The variation I run personally" aria-hidden="true">
+      <div class="slide-inner">
+        <header class="runner"><span>One footnote</span><em>18</em></header>
+        <div class="slide-content">
+          <div class="cols even">
+            <div class="mid">
+              <h2>The variation I run on my own subscriptions</h2>
+              <p class="lead">I route a second vendor's models into Claude Code through a local proxy and use them as executors, while Opus still plans and verifies. It is why my own terminal looks slightly different from the recording.</p>
+              <p class="pull">The role split is the transferable part. The routing is not.</p>
+            </div>
+            <div class="rail">
+              <div class="rail-item"><span>It needs a second subscription that you would be paying for yourself.</span></div>
+              <div class="rail-item"><span>The proxy is an independent community project, not a vendor product.</span></div>
+              <div class="rail-item"><span>Provider terms and company policy come first, and both change.</span></div>
+              <div class="rail-item"><span>Nothing else in this talk depends on it, including everything you just watched.</span></div>
+            </div>
+          </div>
+          <p class="foot">Mentioned for completeness, and because people ask. Skip this slide if you are short on time.</p>
+        </div>
+      </div>
+      <aside class="speaker-notes">
+        <p><strong>Timing:</strong> 1 minute. Cut it entirely if you are running long.</p>
+        <p>Keep this deliberately short and deliberately unglamorous. The moment it sounds like a recommendation, half the room stops listening to the transferable part.</p>
+        <p>If anyone wants the setup details, offer to send them afterwards rather than walking through it here.</p>
+        <p>Be straightforward that this is a personal arrangement on personal subscriptions, and that company policy and provider terms are the prerequisite, not an afterthought.</p>
+      </aside>
+    </section>
+
+    <section class="slide" id="slide-19" data-title="Your turn" aria-hidden="true">
+      <div class="slide-inner">
+        <header class="runner"><span>Your turn</span><em>19</em></header>
+        <div class="slide-content">
+          <h2>Pick one real feature and run it end to end</h2>
+          <div class="cols wide-left">
+            <div class="rail">
+              <div class="rail-item"><strong>One feature, two or three issues</strong><span>Something with a genuine design question still open inside it.</span></div>
+              <div class="rail-item"><strong>One executor at a time</strong><span>Stay sequential until you trust your own issue boundaries.</span></div>
+              <div class="rail-item"><strong>Compare it against how you work now</strong><span>Rework, verification quality, and how long the session stays coherent.</span></div>
+            </div>
+            <div class="cta">
+              <b>Before you leave</b>
+              <strong>Install Caravan</strong>
+              <p>Sign in with your work account. Your bus, the itinerary, every roll call and every poll for the trip runs through it.</p>
+            </div>
+          </div>
+          <p class="foot">Questions, and I'll share the issue template and both contracts afterwards.</p>
+        </div>
+      </div>
+      <aside class="speaker-notes">
+        <p><strong>Timing:</strong> 1 minute, then open questions.</p>
+        <p>Close on the ask, not on the tooling. One feature, two or three issues, compared honestly against their current method.</p>
+        <p>Offer to share the issue template, the planner contract, and the executor contract in the channel afterwards. Low friction matters more than persuasion here.</p>
+        <p>Put the install QR code on this slide and leave it up through the questions.</p>
+      </aside>
+    </section>
+
+  </main>
+
+  <nav class="controls" aria-label="Presentation controls">
+    <button class="control-btn" id="prevBtn" type="button" aria-label="Previous slide">&#8592;</button>
+    <span class="slide-count" id="slideCount" aria-live="polite">01 / 19</span>
+    <button class="control-btn" id="nextBtn" type="button" aria-label="Next slide">&#8594;</button>
+    <button class="control-btn" id="modeBtn" type="button" aria-label="Switch presentation length">30m</button>
+    <button class="control-btn" id="notesBtn" type="button" aria-label="Toggle presenter notes">Notes</button>
+    <button class="control-btn" id="overviewBtn" type="button" aria-label="Open slide overview">Grid</button>
+    <button class="control-btn" id="fullBtn" type="button" aria-label="Toggle fullscreen">Full</button>
+  </nav>
+
+  <div class="progress-track" aria-hidden="true"><div class="progress-bar" id="progressBar"></div></div>
+
+  <aside class="notes-panel" id="notesPanel" aria-label="Presenter notes" hidden>
+    <button class="notes-close" id="notesClose" type="button" aria-label="Close presenter notes">Close</button>
+    <h2>Presenter notes</h2>
+    <div id="notesContent"></div>
+  </aside>
+
+  <div class="overview" id="overview" role="dialog" aria-modal="true" aria-label="Slide overview" hidden>
+    <div class="overview-head"><h2>Slide overview</h2><button class="overview-close" id="overviewClose" type="button">Close</button></div>
+    <div class="overview-grid" id="overviewGrid"></div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      const slides = [...document.querySelectorAll('.slide')];
+      const count = document.getElementById('slideCount');
+      const progress = document.getElementById('progressBar');
+      const notesPanel = document.getElementById('notesPanel');
+      const notesContent = document.getElementById('notesContent');
+      const overview = document.getElementById('overview');
+      const overviewGrid = document.getElementById('overviewGrid');
+      const modeBtn = document.getElementById('modeBtn');
+      const toast = document.getElementById('toast');
+      let index = 0;
+      let toastTimer;
+
+      const fromHash = () => {
+        const match = location.hash.match(/^#slide-(\d+)$/);
+        return match ? Math.max(0, Math.min(slides.length - 1, Number(match[1]) - 1)) : 0;
+      };
+
+      const pad = value => String(value).padStart(2, '0');
+
+      const showToast = message => {
+        clearTimeout(toastTimer);
+        toast.textContent = message;
+        toast.classList.add('show');
+        toastTimer = setTimeout(() => toast.classList.remove('show'), 1600);
+      };
+
+      const updateNotes = () => {
+        const notes = slides[index].querySelector('.speaker-notes');
+        notesContent.innerHTML = notes ? notes.innerHTML : '<p>No notes for this slide.</p>';
+      };
+
+      const updateOverview = () => {
+        overviewGrid.querySelectorAll('.overview-card').forEach((card, cardIndex) => {
+          card.classList.toggle('current', cardIndex === index);
+        });
+      };
+
+      const show = (nextIndex, updateHash = true) => {
+        index = Math.max(0, Math.min(slides.length - 1, nextIndex));
+        slides.forEach((slide, slideIndex) => {
+          slide.classList.toggle('active', slideIndex === index);
+          slide.classList.toggle('previous', slideIndex < index);
+          slide.setAttribute('aria-hidden', slideIndex === index ? 'false' : 'true');
+        });
+        count.textContent = `${pad(index + 1)} / ${pad(slides.length)}`;
+        progress.style.width = `${((index + 1) / slides.length) * 100}%`;
+        document.title = `${slides[index].dataset.title} · Agentic development`;
+        updateNotes();
+        updateOverview();
+        if (updateHash) history.replaceState(null, '', `#slide-${index + 1}`);
+        if (window.matchMedia('(max-width: 860px)').matches) window.scrollTo(0, 0);
+      };
+
+      const closeOverlays = () => {
+        let closed = false;
+        if (!notesPanel.hidden) { notesPanel.hidden = true; closed = true; }
+        if (!overview.hidden) { overview.hidden = true; closed = true; }
+        return closed;
+      };
+
+      const toggleNotes = () => {
+        notesPanel.hidden = !notesPanel.hidden;
+        if (!notesPanel.hidden) {
+          overview.hidden = true;
+          updateNotes();
+          document.getElementById('notesClose').focus();
+        }
+      };
+
+      const toggleOverview = () => {
+        overview.hidden = !overview.hidden;
+        if (!overview.hidden) {
+          notesPanel.hidden = true;
+          updateOverview();
+          overviewGrid.querySelector('.overview-card.current')?.focus();
+        }
+      };
+
+      const toggleMode = () => {
+        const nextMode = document.body.dataset.mode === '30' ? '45' : '30';
+        document.body.dataset.mode = nextMode;
+        modeBtn.textContent = `${nextMode}m`;
+        modeBtn.setAttribute('aria-label', `Presentation route: ${nextMode} minutes. Activate to switch.`);
+        showToast(`${nextMode}-minute route`);
+      };
+
+      const toggleFullscreen = async () => {
+        try {
+          if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
+          else await document.exitFullscreen();
+        } catch {
+          showToast('Fullscreen is unavailable in this browser');
+        }
+      };
+
+      const cleanCopy = element => {
+        const clone = element.cloneNode(true);
+        clone.querySelectorAll('button, .extended-badge').forEach(node => node.remove());
+        return clone.textContent.trim().replace(/\n{3,}/g, '\n\n');
+      };
+
+      const copyText = async element => {
+        const value = cleanCopy(element);
+        try {
+          await navigator.clipboard.writeText(value);
+          showToast('Copied');
+        } catch {
+          const area = document.createElement('textarea');
+          area.value = value;
+          area.setAttribute('readonly', '');
+          area.style.position = 'fixed';
+          area.style.opacity = '0';
+          document.body.appendChild(area);
+          area.select();
+          const copied = document.execCommand('copy');
+          area.remove();
+          showToast(copied ? 'Copied' : 'Select and copy the prompt manually');
+        }
+      };
+
+      slides.forEach((slide, slideIndex) => {
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'overview-card';
+        card.innerHTML = `<b>${pad(slideIndex + 1)}</b><strong>${slide.dataset.title}</strong>`;
+        card.addEventListener('click', () => {
+          overview.hidden = true;
+          show(slideIndex);
+        });
+        overviewGrid.appendChild(card);
+      });
+
+      document.querySelectorAll('[data-copy]').forEach(button => {
+        button.addEventListener('click', event => {
+          event.stopPropagation();
+          const target = document.getElementById(button.dataset.copy);
+          if (target) copyText(target);
+        });
+      });
+
+      document.getElementById('prevBtn').addEventListener('click', () => show(index - 1));
+      document.getElementById('nextBtn').addEventListener('click', () => show(index + 1));
+      document.getElementById('modeBtn').addEventListener('click', toggleMode);
+      document.getElementById('notesBtn').addEventListener('click', toggleNotes);
+      document.getElementById('notesClose').addEventListener('click', toggleNotes);
+      document.getElementById('overviewBtn').addEventListener('click', toggleOverview);
+      document.getElementById('overviewClose').addEventListener('click', toggleOverview);
+      document.getElementById('fullBtn').addEventListener('click', toggleFullscreen);
+
+      let touchX = null, touchY = null;
+      document.addEventListener('touchstart', event => {
+        if (event.touches.length !== 1) { touchX = null; return; }
+        touchX = event.touches[0].clientX;
+        touchY = event.touches[0].clientY;
+      }, { passive: true });
+      document.addEventListener('touchend', event => {
+        if (touchX === null) return;
+        if (!overview.hidden || !notesPanel.hidden) return;
+        if (event.target.closest('button, a, .prompt')) return;
+        const dx = event.changedTouches[0].clientX - touchX;
+        const dy = event.changedTouches[0].clientY - touchY;
+        touchX = null;
+        if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.6) return;
+        show(dx < 0 ? index + 1 : index - 1);
+      }, { passive: true });
+
+      document.addEventListener('keydown', event => {
+        if (event.target.matches('button, a, textarea, input')) {
+          if (event.key === 'Escape') closeOverlays();
+          return;
+        }
+
+        if (event.key === 'Escape') {
+          if (closeOverlays()) event.preventDefault();
+          return;
+        }
+
+        if (!overview.hidden || !notesPanel.hidden) return;
+
+        if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].includes(event.key)) {
+          event.preventDefault();
+          show(index + 1);
+        } else if (['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'].includes(event.key)) {
+          event.preventDefault();
+          show(index - 1);
+        } else if (event.key === 'Home') {
+          event.preventDefault();
+          show(0);
+        } else if (event.key === 'End') {
+          event.preventDefault();
+          show(slides.length - 1);
+        } else if (event.key.toLowerCase() === 'n') {
+          toggleNotes();
+        } else if (event.key.toLowerCase() === 'o') {
+          toggleOverview();
+        } else if (event.key.toLowerCase() === 'f') {
+          toggleFullscreen();
+        } else if (event.key.toLowerCase() === 'm') {
+          toggleMode();
+        }
+      });
+
+      window.addEventListener('hashchange', () => show(fromHash(), false));
+      show(fromHash(), false);
+    })();
+  </script>
+</body>
+</html>
